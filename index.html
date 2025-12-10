@@ -1,0 +1,872 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atualizador BFMidi2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #030305;
+      --card-bg: rgba(255, 255, 255, 0.03);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --primary: #2563eb;
+      --primary-glow: #3b82f6;
+      --success: #10b981;
+      --text-main: #ffffff;
+      --text-muted: #94a3b8;
+      --font-family: 'Inter', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      outline: none;
+    }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(circle at 50% 0%, rgba(37, 99, 235, 0.15), transparent 40%),
+        radial-gradient(circle at 80% 80%, rgba(16, 185, 129, 0.08), transparent 40%);
+      font-family: var(--font-family);
+      color: var(--text-main);
+      overflow: hidden;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+      padding: 20px;
+      perspective: 1000px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 40px 32px;
+      text-align: center;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.3s ease;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 800;
+      margin: 0 0 8px 0;
+      letter-spacing: -0.02em;
+    }
+
+    p {
+      color: var(--text-muted);
+      font-size: 15px;
+      margin: 0 0 32px 0;
+      line-height: 1.5;
+    }
+
+    .status-ring {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--card-border);
+      margin: 0 auto 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .status-ring svg {
+      width: 48px;
+      height: 48px;
+      color: var(--text-muted);
+      transition: all 0.5s ease;
+    }
+
+    .status-ring.active {
+      border-color: var(--primary);
+      box-shadow: 0 0 30px rgba(37, 99, 235, 0.2);
+    }
+
+    .status-ring.active svg {
+      color: var(--primary);
+    }
+
+    .status-ring.flashing {
+      border-color: var(--primary);
+      border-top-color: transparent;
+      border-right-color: transparent;
+      box-shadow: 0 0 30px rgba(37, 99, 235, 0.4);
+      animation: spin 1s linear infinite;
+    }
+
+    .status-ring.flashing svg {
+      color: var(--primary);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
+      }
+
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
+    }
+
+    .status-ring.success {
+      border-color: var(--success);
+      box-shadow: 0 0 30px rgba(16, 185, 129, 0.2);
+    }
+
+    .status-ring.success svg {
+      color: var(--success);
+    }
+
+    .status-ring.error {
+      border-color: #ef4444;
+      box-shadow: 0 0 30px rgba(239, 68, 68, 0.2);
+    }
+
+    .status-ring.error svg {
+      color: #ef4444;
+    }
+
+    .accent-orange {
+      color: #f97316;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 18px;
+      border-radius: 16px;
+      border: none;
+      background: linear-gradient(135deg, var(--primary), #1d4ed8);
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+    }
+
+    .btn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      background: #334155;
+      box-shadow: none;
+      color: #94a3b8;
+    }
+
+    .progress-container {
+      margin-top: 24px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 99px;
+      height: 6px;
+      overflow: hidden;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .progress-container.visible {
+      opacity: 1;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: var(--primary);
+      width: 0%;
+      transition: width 0.2s ease;
+      box-shadow: 0 0 10px var(--primary);
+    }
+
+    .status-text {
+      margin-top: 16px;
+      font-size: 13px;
+      color: var(--text-muted);
+      min-height: 20px;
+    }
+
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+      border-top-color: var(--primary);
+      animation: spin 1s ease-in-out infinite;
+      margin: 20px auto;
+      display: none;
+    }
+
+    .spinner.visible {
+      display: block;
+    }
+
+    /* Stepper */
+    .stepper-container {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      margin-top: 30px;
+      width: 100%;
+      padding: 0 10px;
+    }
+
+    .step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      z-index: 2;
+      flex: 0 0 auto;
+    }
+
+    .circle {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.3);
+      transition: all 0.4s ease;
+    }
+
+    .label {
+      margin-top: 8px;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.3);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: all 0.4s ease;
+    }
+
+    .line {
+      flex: 1;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.1);
+      margin: 15px 5px 0 5px;
+      /* Align with circle center */
+      transition: all 0.4s ease;
+    }
+
+    /* Active/Done States */
+    .step.active .circle {
+      border-color: var(--primary);
+      color: white;
+      box-shadow: 0 0 15px rgba(37, 99, 235, 0.4);
+      background: rgba(37, 99, 235, 0.1);
+    }
+
+    .step.active .label {
+      color: white;
+    }
+
+    .step.done .circle {
+      background: #10b981;
+      border-color: #10b981;
+      color: white;
+    }
+
+    .step.done .label {
+      color: #10b981;
+    }
+
+    .line.active {
+      background: var(--primary);
+    }
+
+    .line.done {
+      background: #10b981;
+    }
+
+    /* Hidden technical elements */
+    #log {
+      display: none;
+      width: 100%;
+      height: 150px;
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 10px;
+      margin-top: 20px;
+      font-family: monospace;
+      font-size: 12px;
+      color: var(--text-muted);
+      overflow-y: auto;
+      text-align: left;
+      white-space: pre-wrap;
+    }
+
+    #log.visible {
+      display: block;
+    }
+
+    .debug-toggle {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 12px;
+      cursor: pointer;
+      text-decoration: underline;
+      margin-top: 10px;
+      opacity: 0.5;
+    }
+
+    .debug-toggle:hover {
+      opacity: 1;
+    }
+
+    #fileList,
+    #baudSelect {
+      display: none;
+    }
+
+    /* Error toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #fca5a5;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-size: 14px;
+      backdrop-filter: blur(10px);
+      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 100;
+      max-width: 90%;
+      text-align: center;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+    <div class="card">
+      <div class="status-ring" id="statusRing">
+        <!-- Icon: Chip/CPU -->
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+          stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25z" />
+        </svg>
+      </div>
+
+      <h1>BFMiDI update <span class="accent-orange">v9</span></h1>
+      <p id="description">Conecte seu dispositivo USB para iniciar a atualização do firmware oficial.</p>
+
+      <button class="btn" id="actionBtn">Conectar Dispositivo</button>
+      <div class="spinner" id="spinner"></div>
+
+      <div class="stepper-container">
+        <div class="step active" id="step1">
+          <div class="circle">1</div>
+          <div class="label">Conectar</div>
+        </div>
+        <div class="line" id="line1"></div>
+        <div class="step" id="step2">
+          <div class="circle">2</div>
+          <div class="label">Autorizar</div>
+        </div>
+        <div class="line" id="line2"></div>
+        <div class="step" id="step3">
+          <div class="circle">3</div>
+          <div class="label">Atualizar</div>
+        </div>
+      </div>
+
+      <div class="progress-container" id="progressContainer">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+
+      <div class="status-text" id="statusText">Aguardando conexão...</div>
+
+      <button class="debug-toggle" id="debugToggle">Mostrar Logs de Debug</button>
+      <div id="log"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- Hidden technical elements needed for logic -->
+  <!-- <div id="log"></div> Moved inside card -->
+  <select id="baudSelect">
+    <option value="921600" selected>921600</option>
+  </select>
+
+  <script src="https://cdn.jsdelivr.net/npm/web-serial-polyfill@1.0.14/dist/serial.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.js"></script>
+  <script type="module">
+    import { ESPLoader, Transport } from "https://unpkg.com/esptool-js@latest/bundle.js";
+
+    const actionBtn = document.getElementById("actionBtn");
+    const spinner = document.getElementById("spinner");
+    const statusText = document.getElementById("statusText");
+    const statusRing = document.getElementById("statusRing");
+    const progressBar = document.getElementById("progressBar");
+    const progressContainer = document.getElementById("progressContainer");
+    const toastEl = document.getElementById("toast");
+    const logEl = document.getElementById("log");
+    const debugToggle = document.getElementById("debugToggle");
+    const baudSelect = document.getElementById("baudSelect");
+
+    debugToggle.addEventListener('click', () => {
+      logEl.classList.toggle('visible');
+      debugToggle.textContent = logEl.classList.contains('visible') ? "Ocultar Logs" : "Mostrar Logs de Debug";
+    });
+
+    const serialLib = navigator.serial ? navigator.serial : (navigator.usb ? window.serial : null);
+
+    // Configurações fixas
+    const defaultFilters = [
+      { usbVendorId: 0x303a, usbProductId: 0x80c2 },
+      { usbVendorId: 0x303a, usbProductId: 0x0002 },
+      { usbVendorId: 0x303a },
+    ];
+
+    const images = [
+      { path: "bootloader.bin", address: 0x1000 },
+      { path: "partition-table.bin", address: 0x8000 },
+      { path: "app.bin", address: 0x10000 },
+    ];
+
+    let device = null;
+    let transport = null;
+    let esploader = null;
+    let lastPortInfo = null;
+    let appState = 'idle'; // idle, connected, flashing, done
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    // Stepper Elements
+    const step1 = document.getElementById("step1");
+    const step2 = document.getElementById("step2");
+    const step3 = document.getElementById("step3");
+    const line1 = document.getElementById("line1");
+    const line2 = document.getElementById("line2");
+
+    function updateStepper(step) {
+      // Reset all
+      [step1, step2, step3].forEach(s => s.className = "step");
+      [line1, line2].forEach(l => l.className = "line");
+
+      if (step >= 1) {
+        step1.classList.add("active");
+      }
+      if (step >= 2) {
+        step1.classList.remove("active");
+        step1.classList.add("done");
+        line1.classList.add("done");
+        step2.classList.add("active");
+      }
+      if (step >= 3) {
+        step2.classList.remove("active");
+        step2.classList.add("done");
+        line2.classList.add("done");
+        step3.classList.add("active");
+      }
+      if (step === 4) { // Done state
+        step3.classList.remove("active");
+        step3.classList.add("done");
+      }
+    }
+
+    // --- UI Helpers ---
+
+    const description = document.getElementById("description");
+
+    function setUIState(state, message) {
+      appState = state;
+      statusText.textContent = message || "";
+
+      // Reset classes
+      statusRing.className = "status-ring";
+      actionBtn.disabled = false;
+      actionBtn.style.display = "block"; // Default show
+      spinner.classList.remove("visible"); // Default hide
+
+      // Reset icon if needed (restore Chip icon)
+      if (state !== 'done') {
+        statusRing.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25z" />
+          </svg>`;
+      }
+
+      switch (state) {
+        case 'idle':
+          updateStepper(1);
+          actionBtn.textContent = "Conectar Dispositivo";
+          description.textContent = "Conecte seu dispositivo USB para iniciar a atualização do firmware oficial.";
+          progressContainer.classList.remove("visible");
+          break;
+        case 'awaiting_port':
+          updateStepper(2);
+          actionBtn.textContent = "Autorizar Conexão";
+          description.textContent = "Por segurança, o navegador precisa que você confirme a nova porta. Clique abaixo e selecione o dispositivo.";
+          actionBtn.style.display = "block";
+          spinner.classList.remove("visible");
+          statusRing.classList.add("active");
+          break;
+        case 'connecting':
+          updateStepper(2);
+          actionBtn.style.display = "none"; // Hide button
+          spinner.classList.add("visible"); // Show spinner
+          statusRing.classList.add("active");
+          break;
+        case 'connected':
+          updateStepper(3);
+          actionBtn.textContent = "Iniciar Atualização";
+          description.textContent = "Dispositivo conectado. Pronto para gravar.";
+          statusRing.classList.add("active");
+          break;
+        case 'flashing':
+          updateStepper(3);
+          actionBtn.textContent = "Atualizando...";
+          description.textContent = "Update em andamento...";
+          actionBtn.disabled = true;
+          statusRing.classList.add("flashing");
+          progressContainer.classList.add("visible");
+          break;
+        case 'done':
+          updateStepper(4);
+          actionBtn.textContent = "Atualizado com Sucesso";
+          description.textContent = "Processo finalizado com sucesso.";
+          statusRing.classList.add("success");
+          progressContainer.classList.remove("visible");
+          // Change to Checkmark Icon
+          statusRing.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+            </svg>`;
+          break;
+        case 'error':
+          actionBtn.textContent = "Tentar Novamente";
+          statusRing.classList.add("error");
+          progressContainer.classList.remove("visible");
+          document.getElementById("log").classList.add("visible"); // Auto-show logs on error
+          document.getElementById("debugToggle").textContent = "Ocultar Logs";
+          break;
+      }
+    }
+
+    function showToast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add("show");
+      setTimeout(() => toastEl.classList.remove("show"), 5000);
+    }
+
+    // Main Button Handler
+    actionBtn.addEventListener('click', () => {
+      if (appState === 'idle' || appState === 'error' || appState === 'awaiting_port') {
+        handleConnect();
+      } else if (appState === 'connected') {
+        handleFlash();
+      }
+    });
+    function log(msg) {
+      console.log(msg);
+      const line = document.createElement('div');
+      line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      logEl.appendChild(line);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    // --- Core Logic (Adapted) ---
+
+    const espLoaderTerminal = {
+      clean() { },
+      writeLine(data) { log(data); },
+      write(data) { log(data); },
+    };
+
+    async function acquirePort() {
+      if (!serialLib) throw new Error("Navegador incompatível. Use Chrome ou Edge.");
+
+      log("User Agent: " + navigator.userAgent);
+      log("Solicitando porta serial...");
+
+      const filters = lastPortInfo ? [lastPortInfo] : defaultFilters;
+      try {
+        device = await serialLib.requestPort({ filters });
+        const info = device.getInfo();
+        lastPortInfo = { usbVendorId: info.usbVendorId, usbProductId: info.usbProductId };
+        return device;
+      } catch (err) {
+        if (err.name === "NotFoundError") return null; // User cancelled
+        throw err;
+      }
+    }
+
+    function wrapSignals(t) {
+      const wrap = (fn) => async (val) => {
+        try { return await fn.call(t, val); }
+        catch (err) { log("Signal error: " + err.message); }
+      };
+      if (t?.setDTR) t.setDTR = wrap(t.setDTR);
+      if (t?.setRTS) t.setRTS = wrap(t.setRTS);
+      return t;
+    }
+
+    async function closeTransportSafe(t) {
+      if (!t) return;
+      try {
+        await t.disconnect();
+        await t.waitForUnlock?.(200);
+      } catch (e) { }
+    }
+
+    async function pulseBootMode(t) {
+      await t.setRTS?.(true);
+      await t.setDTR?.(false);
+      await sleep(150);
+      await t.setDTR?.(true);
+      await t.setRTS?.(false);
+      await sleep(150);
+    }
+
+    async function waitForReconnect(timeoutMs = 15000) {
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        const ports = await serialLib.getPorts();
+        const match = ports.find(p => {
+          const info = p.getInfo();
+          return info.usbVendorId === lastPortInfo.usbVendorId;
+        });
+        if (match) {
+          device = match;
+          const info = device.getInfo();
+          lastPortInfo = { usbVendorId: info.usbVendorId, usbProductId: info.usbProductId };
+          log(`Reconectado: VID=${info.usbVendorId.toString(16)} PID=${info.usbProductId.toString(16)}`);
+          return match;
+        }
+        await sleep(250);
+      }
+      log("Timeout aguardando reconexão.");
+      throw new Error("Dispositivo não reconectou. Tente desconectar e conectar o cabo.");
+    }
+
+    async function handleConnect() {
+      try {
+        const selectedDevice = await acquirePort();
+        if (!selectedDevice) return; // Cancelled
+
+        setUIState('connecting', "Preparando dispositivo...");
+        await sleep(500);
+
+        const isBootloader = lastPortInfo?.usbProductId === 0x0002;
+
+        if (!isBootloader) {
+          let preTransport = null;
+          try {
+            preTransport = wrapSignals(new Transport(device, true));
+            await preTransport.connect(115200);
+            await pulseBootMode(preTransport);
+          } catch (e) {
+            log("Boot pulse warning: " + e.message);
+          } finally {
+            await closeTransportSafe(preTransport);
+          }
+
+          setUIState('connecting', "Reiniciando em modo download...");
+          setUIState('connecting', "Reiniciando em modo download...");
+          // Delay critico de 3s para macOS
+          log("Aguardando 3s para re-enumeração USB...");
+          await sleep(3000);
+
+          // Tenta reconectar
+          try {
+            await waitForReconnect(15000);
+          } catch (e) {
+            // Se falhar reconexao automatica (permissao), pedimos manual
+            log("Falha no reconnect automatico: " + e.message);
+            device = null;
+            lastPortInfo = null; // Limpa filtro para permitir novo PID (0x0002)
+          }
+        }
+
+        // Se device for null aqui, significa que precisamos de intervencao manual
+        if (!device) {
+          setUIState('awaiting_port', "Clique para confirmar a porta do dispositivo...");
+          return; // Sai da funcao e aguarda clique do usuario
+        }
+
+        // Se por algum motivo device for null (ex: falha no wait e no acquire), paramos
+        if (!device) throw new Error("Dispositivo não selecionado.");
+
+        transport = wrapSignals(new Transport(device, true));
+        esploader = new ESPLoader({
+          transport,
+          baudrate: 115200, // Forçado 115200 para evitar erro de troca de baud no Mac (USB Nativo ignora baud, então continua rápido)
+          terminal: espLoaderTerminal,
+        });
+
+        // Pequeno delay para estabilizar a porta no Mac antes do handshake
+        await sleep(100);
+
+        await esploader.main('no_reset');
+        setUIState('connected', "Dispositivo pronto. Clique para atualizar.");
+
+      } catch (err) {
+        log("Erro fatal: " + err.message);
+        log(err.stack);
+        setUIState('error', "Erro na conexão: " + err.message);
+        showToast(err.message);
+        await disconnect(true);
+      }
+    }
+
+    async function disconnect(silent = false) {
+      try { if (transport) await transport.disconnect(); } catch (e) { }
+      device = null;
+      transport = null;
+      esploader = null;
+      if (!silent) setUIState('idle', "Aguardando conexão...");
+    }
+
+    async function fetchBinaryString(path) {
+      const res = await fetch(path);
+      if (!res.ok) throw new Error("Arquivo não encontrado: " + path);
+      const buffer = await res.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      }
+      return binary;
+    }
+
+    async function handleFlash() {
+      if (!esploader) return;
+
+      setUIState('flashing', "Preparando arquivos...");
+
+      try {
+        const fileArray = [];
+        let totalSize = 0;
+
+        // Load files
+        for (const img of images) {
+          const data = await fetchBinaryString(img.path);
+          fileArray.push({ data, address: img.address });
+          totalSize += data.length;
+        }
+
+        setUIState('flashing', "Gravando firmware...");
+
+        // Flash
+        await esploader.writeFlash({
+          fileArray,
+          eraseAll: false,
+          compress: true,
+          flashSize: "4MB",
+          reportProgress: (idx, written, total) => {
+            // Calculate global progress roughly
+            const percent = Math.floor((written / total) * 100);
+            progressBar.style.width = percent + "%";
+            statusText.textContent = `Gravando... ${percent}%`;
+          },
+          calculateMD5Hash: (image) => CryptoJS.MD5(CryptoJS.enc.Latin1.parse(image)),
+        });
+
+        await esploader.after();
+
+        setUIState('flashing', "Reiniciando dispositivo...");
+        try {
+          await esploader.hardReset();
+        } catch (e) {
+          // Ignoramos erro aqui pois o dispositivo desconecta ao reiniciar (USB Nativo)
+        }
+
+        setUIState('done', "Atualização concluída!");
+        progressBar.style.width = "100%";
+
+        // Auto disconnect logic
+        await disconnect(true);
+
+        // Reset UI after a few seconds
+        setTimeout(() => {
+          setUIState('idle', "Pronto para nova atualização");
+          progressBar.style.width = "0%";
+        }, 5000);
+
+      } catch (err) {
+        setUIState('error', "Falha na gravação");
+        showToast(err.message);
+        await disconnect(true);
+      }
+    }
+
+    // Main Button Handler
+    actionBtn.addEventListener('click', () => {
+      if (appState === 'idle' || appState === 'error') {
+        handleConnect();
+      } else if (appState === 'connected') {
+        handleFlash();
+      }
+    });
+
+  </script>
+</body>
+
+</html>
