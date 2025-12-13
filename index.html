@@ -396,6 +396,98 @@
     .toast.show {
       transform: translateX(-50%) translateY(0);
     }
+
+    .flash-options {
+      margin-top: 14px;
+      padding: 14px 14px;
+      border-radius: 16px;
+      border: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.02);
+      text-align: left;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .toggle-label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .toggle-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.92);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .toggle-hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.35;
+    }
+
+    .switch {
+      position: relative;
+      width: 44px;
+      height: 26px;
+      flex: 0 0 auto;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(148, 163, 184, 0.3);
+      transition: 0.2s;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      top: 50%;
+      transform: translateY(-50%);
+      background-color: white;
+      transition: 0.2s;
+      border-radius: 999px;
+    }
+
+    .switch input:checked+.slider {
+      background-color: rgba(37, 99, 235, 0.8);
+      border-color: rgba(59, 130, 246, 0.5);
+      box-shadow: 0 0 16px rgba(37, 99, 235, 0.25);
+    }
+
+    .switch input:checked+.slider:before {
+      transform: translateY(-50%) translateX(18px);
+    }
+
+    .switch input:disabled+.slider {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 
@@ -412,11 +504,32 @@
         </svg>
       </div>
 
-      <h1>BFMiDI update <span class="accent-orange">PREVIEW</span></h1>
+      <h1>BFMiDI update <span class="accent-orange">v9</span></h1>
       <p id="description">Conecte seu dispositivo USB para iniciar a atualização do firmware oficial.</p>
 
       <button class="btn" id="actionBtn">Conectar Dispositivo</button>
       <div class="spinner" id="spinner"></div>
+
+      <div class="flash-options" id="flashOptions">
+        <div class="toggle-row">
+          <div class="toggle-label">
+            <div class="toggle-title">Update Automático</div>
+          </div>
+          <label class="switch" aria-label="Update Automático">
+            <input type="checkbox" id="autoFlashToggle" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="toggle-row" style="margin-top: 12px;">
+          <div class="toggle-label">
+            <div class="toggle-title">Apagar Memória</div>
+          </div>
+          <label class="switch" aria-label="Apagar Memória">
+            <input type="checkbox" id="eraseAllToggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
 
       <div class="stepper-container">
         <div class="step active" id="step1">
@@ -469,11 +582,9 @@
     const logEl = document.getElementById("log");
     const debugToggle = document.getElementById("debugToggle");
     const baudSelect = document.getElementById("baudSelect");
-
-    debugToggle.addEventListener('click', () => {
-      logEl.classList.toggle('visible');
-      debugToggle.textContent = logEl.classList.contains('visible') ? "Ocultar Logs" : "Mostrar Logs de Debug";
-    });
+    const flashOptions = document.getElementById("flashOptions");
+    const eraseAllToggle = document.getElementById("eraseAllToggle");
+    const autoFlashToggle = document.getElementById("autoFlashToggle");
 
     const serialLib = navigator.serial ? navigator.serial : (navigator.usb ? window.serial : null);
 
@@ -495,6 +606,22 @@
     let esploader = null;
     let lastPortInfo = null;
     let appState = 'idle'; // idle, connected, flashing, done
+    let autoFlashMode = autoFlashToggle.checked; // Inicializa baseado no checkbox
+
+    // Sincroniza o modo automático com o toggle
+    autoFlashToggle.addEventListener('change', () => {
+      autoFlashMode = autoFlashToggle.checked;
+      log("Modo automático: " + (autoFlashMode ? "ATIVADO" : "DESATIVADO"));
+      // Atualiza a UI se estiver no estado idle
+      if (appState === 'idle') {
+        setUIState('idle', "Aguardando conexão...");
+      }
+    });
+
+    debugToggle.addEventListener('click', () => {
+      logEl.classList.toggle('visible');
+      debugToggle.textContent = logEl.classList.contains('visible') ? "Ocultar Logs" : "Mostrar Logs de Debug";
+    });
 
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -544,6 +671,14 @@
       actionBtn.disabled = false;
       actionBtn.style.display = "block"; // Default show
       spinner.classList.remove("visible"); // Default hide
+      if (flashOptions) flashOptions.style.display = "block";
+      const isProcessing = (state === 'flashing' || state === 'connecting' || state === 'awaiting_port');
+      if (eraseAllToggle) {
+        eraseAllToggle.disabled = isProcessing;
+      }
+      if (autoFlashToggle) {
+        autoFlashToggle.disabled = isProcessing;
+      }
 
       // Reset icon if needed (restore Chip icon)
       if (state !== 'done') {
@@ -556,8 +691,10 @@
       switch (state) {
         case 'idle':
           updateStepper(1);
-          actionBtn.textContent = "Conectar Dispositivo";
-          description.textContent = "Conecte seu dispositivo USB para iniciar a atualização do firmware oficial.";
+          actionBtn.textContent = autoFlashMode ? "Conectar e Atualizar" : "Conectar Dispositivo";
+          description.textContent = autoFlashMode
+            ? "Clique no botão abaixo para conectar e atualizar automaticamente."
+            : "Conecte seu dispositivo USB para iniciar a atualização do firmware oficial.";
           progressContainer.classList.remove("visible");
           break;
         case 'awaiting_port':
@@ -677,12 +814,24 @@
     }
 
     async function pulseBootMode(t) {
-      await t.setRTS?.(true);
-      await t.setDTR?.(false);
-      await sleep(150);
-      await t.setDTR?.(true);
-      await t.setRTS?.(false);
-      await sleep(150);
+      // Sequência de boot para ESP32-S3 USB nativo
+      // GPIO0 = DTR (boot), EN/RESET = RTS
+      log("Enviando sequência de boot...");
+
+      // Reset inicial
+      await t.setRTS?.(true);   // EN baixo (reset)
+      await t.setDTR?.(true);   // GPIO0 baixo (boot mode)
+      await sleep(100);
+
+      // Solta reset mantendo GPIO0 baixo
+      await t.setRTS?.(false);  // EN alto (sai do reset)
+      await sleep(50);
+
+      // Solta GPIO0
+      await t.setDTR?.(false);  // GPIO0 alto
+      await sleep(50);
+
+      log("Sequência de boot enviada.");
     }
 
     async function waitForReconnect(timeoutMs = 15000) {
@@ -754,18 +903,70 @@
         // Se por algum motivo device for null (ex: falha no wait e no acquire), paramos
         if (!device) throw new Error("Dispositivo não selecionado.");
 
-        transport = wrapSignals(new Transport(device, true));
-        esploader = new ESPLoader({
-          transport,
-          baudrate: 115200, // Forçado 115200 para evitar erro de troca de baud no Mac (USB Nativo ignora baud, então continua rápido)
-          terminal: espLoaderTerminal,
-        });
+        // Delay maior para estabilizar a porta após reconexão
+        log("Aguardando estabilização da porta...");
+        await sleep(500);
 
-        // Pequeno delay para estabilizar a porta no Mac antes do handshake
-        await sleep(100);
+        // Tenta conectar com retry em caso de "invalid response"
+        let connected = false;
+        let lastError = null;
+        const maxRetries = 3;
 
-        await esploader.main('no_reset');
+        for (let attempt = 1; attempt <= maxRetries && !connected; attempt++) {
+          try {
+            log(`Tentativa de conexão ${attempt}/${maxRetries}...`);
+
+            // Fecha transport anterior se existir
+            if (transport) {
+              await closeTransportSafe(transport);
+              transport = null;
+              esploader = null;
+              await sleep(300);
+            }
+
+            transport = wrapSignals(new Transport(device, true));
+            esploader = new ESPLoader({
+              transport,
+              baudrate: 115200,
+              terminal: espLoaderTerminal,
+              romBaudrate: 115200,
+            });
+
+            await esploader.main('no_reset');
+            connected = true;
+            log("Conexão estabelecida com sucesso!");
+
+          } catch (err) {
+            lastError = err;
+            log(`Tentativa ${attempt} falhou: ${err.message}`);
+
+            // Se for "invalid response", tenta novamente após delay
+            if (err.message.includes("invalid response") && attempt < maxRetries) {
+              log("Aguardando antes de nova tentativa...");
+              await closeTransportSafe(transport);
+              transport = null;
+              esploader = null;
+              await sleep(1000 * attempt); // Delay progressivo: 1s, 2s, 3s
+            } else if (attempt >= maxRetries) {
+              throw lastError;
+            } else {
+              throw err;
+            }
+          }
+        }
+
+        if (!connected) {
+          throw lastError || new Error("Falha ao conectar após múltiplas tentativas");
+        }
+
         setUIState('connected', "Dispositivo pronto. Clique para atualizar.");
+
+        // Se estiver em modo automático, inicia o flash automaticamente
+        if (autoFlashMode) {
+          log("Modo automático ativo - iniciando gravação...");
+          await sleep(300);
+          handleFlash();
+        }
 
       } catch (err) {
         log("Erro fatal: " + err.message);
@@ -802,22 +1003,60 @@
       setUIState('flashing', "Preparando arquivos...");
 
       try {
+        const shouldEraseAll = !!eraseAllToggle?.checked;
+        const canEraseBeforeWrite = typeof esploader.eraseFlash === "function";
+
+        // Erase All Flash - com tratamento de erro adequado
+        if (shouldEraseAll) {
+          progressBar.style.width = "0%";
+          setUIState('flashing', "Apagando toda a memória...");
+          log("Iniciando Erase All Flash...");
+
+          if (canEraseBeforeWrite) {
+            try {
+              await esploader.eraseFlash();
+              log("Erase All Flash concluido com sucesso.");
+            } catch (eraseErr) {
+              // Alguns chips retornam erro mas o erase funciona
+              // Verificamos se é um erro crítico ou apenas um warning
+              log("Aviso no Erase Flash: " + eraseErr.message);
+
+              // Se o erro contiver "timeout" ou "disconnect", é crítico
+              if (eraseErr.message.toLowerCase().includes("timeout") ||
+                  eraseErr.message.toLowerCase().includes("disconnect")) {
+                throw eraseErr;
+              }
+              // Caso contrário, continuamos (o erase pode ter funcionado)
+              log("Continuando com a gravação...");
+            }
+          }
+
+          // Pequeno delay para garantir que o chip está pronto
+          await sleep(500);
+        }
+
         const fileArray = [];
         let totalSize = 0;
 
         // Load files
+        setUIState('flashing', "Carregando arquivos de firmware...");
         for (const img of images) {
+          log(`Carregando ${img.path}...`);
           const data = await fetchBinaryString(img.path);
           fileArray.push({ data, address: img.address });
           totalSize += data.length;
         }
+        log(`Total: ${fileArray.length} arquivos, ${totalSize} bytes`);
 
         setUIState('flashing', "Gravando firmware...");
 
-        // Flash
+        // Flash - usa eraseAll na writeFlash apenas se não tiver o método eraseFlash
+        // ou se eraseFlash não foi executado
+        const useEraseInWrite = shouldEraseAll && !canEraseBeforeWrite;
+
         await esploader.writeFlash({
           fileArray,
-          eraseAll: false,
+          eraseAll: useEraseInWrite,
           compress: true,
           flashSize: "4MB",
           reportProgress: (idx, written, total) => {
@@ -829,42 +1068,44 @@
           calculateMD5Hash: (image) => CryptoJS.MD5(CryptoJS.enc.Latin1.parse(image)),
         });
 
-        await esploader.after();
+        log("Gravação concluída, finalizando...");
+
+        try {
+          await esploader.after();
+        } catch (afterErr) {
+          log("Aviso no after(): " + afterErr.message);
+          // Continuamos mesmo com erro no after()
+        }
 
         setUIState('flashing', "Reiniciando dispositivo...");
         try {
           await esploader.hardReset();
         } catch (e) {
           // Ignoramos erro aqui pois o dispositivo desconecta ao reiniciar (USB Nativo)
+          log("Reset enviado (dispositivo pode ter desconectado)");
         }
 
         setUIState('done', "Atualização concluída!");
         progressBar.style.width = "100%";
+        log("=== ATUALIZAÇÃO CONCLUÍDA COM SUCESSO ===");
 
         // Auto disconnect logic
         await disconnect(true);
 
         // Reset UI after a few seconds
         setTimeout(() => {
-          setUIState('idle', "Pronto para nova atualização");
+          setUIState('idle', "Pronto para uma nova atualização");
           progressBar.style.width = "0%";
         }, 5000);
 
       } catch (err) {
-        setUIState('error', "Falha na gravação");
+        log("ERRO FATAL: " + err.message);
+        log(err.stack || "");
+        setUIState('error', "Falha na gravação do firmware");
         showToast(err.message);
         await disconnect(true);
       }
     }
-
-    // Main Button Handler
-    actionBtn.addEventListener('click', () => {
-      if (appState === 'idle' || appState === 'error') {
-        handleConnect();
-      } else if (appState === 'connected') {
-        handleFlash();
-      }
-    });
 
   </script>
 </body>
